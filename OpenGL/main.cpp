@@ -75,7 +75,6 @@ int main() {
 	// setup viewport size
 	glViewport(0, 0, bufferWidth, bufferHeight);
 	
-
 	// Create and compile the vertex shader
 	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
