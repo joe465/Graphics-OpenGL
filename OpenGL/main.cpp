@@ -10,9 +10,9 @@ const GLint HEIGHT = 600;
 // Vertex Shader
 const char* vertex_shader_source = R"(
 	#version 330 core
-	layout (location = 0) in vec3 aPos;
+	layout (location = 0) in vec2 aPos; // Vertex position attributes
 	void main() {
-		gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+		gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
 	}
 )";
 
@@ -69,7 +69,7 @@ int main() {
 	}
 
 	// setup viewport size
-	glViewport(0, 0, bufferHeight, bufferWidth);
+	glViewport(0, 0, bufferWidth, bufferHeight);
 
 	// Create and compile the vertex shader
 	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -86,7 +86,7 @@ int main() {
 	}
 	else {
 		glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
-		std::cout << "Vertex shader compilation succeeded" << info_log << std::endl;
+		std::cout << "Vertex shader compilation succeed " << info_log << std::endl;
 	}
 
 	// Create and compile the fragment shader
@@ -102,7 +102,7 @@ int main() {
 	}
 	else {
 		glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
-		std::cout << "Fragment shader compilation succeeded : " << info_log << std::endl;
+		std::cout << "Fragment shader compilation succeed " << info_log << std::endl;
 	}
 
 	// Create and link the shader program
@@ -119,18 +119,26 @@ int main() {
 	}
 	else {
 		glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-		std::cout << "Shader program linking succeeded : " << info_log << std::endl;
+		std::cout << "Shader program linking succeed " << info_log << std::endl;
 	}
 
 	// Delete the vertex shader and fragment shader after successfully linked into a shader program
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
 
-	// Define the vertices of a triangle
+	// Define the vertices
 	GLfloat vertices[] = {
-		-0.5f, -0.5f, 0.0f, // Vertex 1 (x, y, z)
-		 0.5f, -0.5f, 0.0f, // Vertex 2 (x, y, z)
-		 0.0f,  0.5f, 0.0f, // Vertex 3 (x, y, z)
+		// vertices for rectangle in x, y coordinate
+
+			// First triangle
+		-0.5f, -0.5f, // Bottom-left vertex
+		 0.5f, -0.5f, // Bottom-right vertex
+		 0.5f,  0.5f, // Top-right vertex
+
+			// Second triangle
+		-0.5f, -0.5f, // Bottom-left vertex (shared with the first triangle)
+		 0.5f,  0.5f, // Top-right vertex (shared with the first triangle)
+		-0.5f,  0.5f  // Top-left vertex (new vertex for the second triangle)
 	};
 
 	// Set up the Vertex Array Object (VAO)
@@ -139,12 +147,16 @@ int main() {
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 
+	// Bind the VAO and the VBO
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	
+	//glBufferData allocates memory on the GPU and copies the vertex datato the VBO
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	// Define the layout of the vertex data
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
 	glEnableVertexAttribArray(0);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -161,8 +173,9 @@ int main() {
 
 		glUseProgram(shader_program);
 		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3); // Draw a triangle
-		
+		glDrawArrays(GL_TRIANGLES, 0, 3); // Draw the first triangle
+		glDrawArrays(GL_TRIANGLES, 3, 3); // Draw the second triangle
+
 		// swap front and back buffer
 		glfwSwapBuffers(mainWindow);
 	}
