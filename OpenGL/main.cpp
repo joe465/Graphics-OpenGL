@@ -1,4 +1,5 @@
 #include <iostream>
+#include <random>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -20,8 +21,11 @@ const char* vertex_shader_source = R"(
 const char* fragment_shader_source = R"(
 	#version 330 core
 	out vec4 FragColor;
+	
+	uniform vec4 rectangleColor;
+	
 	void main() {
-		FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f); // Orange color
+		FragColor = rectangleColor; // Orange color
 	}
 )";
 
@@ -70,6 +74,7 @@ int main() {
 
 	// setup viewport size
 	glViewport(0, 0, bufferWidth, bufferHeight);
+	
 
 	// Create and compile the vertex shader
 	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -126,6 +131,9 @@ int main() {
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
 
+	// Get the location of the uniform variable in the shader program
+	GLint color_uniform_location = glGetUniformLocation(shader_program, "rectangleColor");
+
 	// Define the vertices
 	GLfloat vertices[] = {
 		// vertices for rectangle in x, y coordinate
@@ -162,13 +170,28 @@ int main() {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
+
 	// main loop until window close
 	while (!glfwWindowShouldClose(mainWindow)) {
+		// Create a random number generator engine
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_real_distribution<float> dis(0.0f, 1.0f); // random float between 0.0 and 1.0
+
+		// Generate random color components
+		float red = dis(gen);
+		float green = dis(gen);
+		float blue = dis(gen);
+
+		// Set the uniform color with the random values
+		glUseProgram(shader_program);
+		glUniform4f(color_uniform_location, red, green, blue, 1.0f);
+
 		// get & handle user input events
 		glfwPollEvents();
 
 		// clear window
-		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glUseProgram(shader_program);
