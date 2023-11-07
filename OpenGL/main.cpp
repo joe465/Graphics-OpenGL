@@ -1,213 +1,225 @@
-#include <iostream>
-#include <random>
+#include <stdio.h>
+#include <string.h>
+#include <cmath>
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include <GL\glew.h>
+#include <GLFW\glfw3.h>
 
-// window dimensions
-const GLint WIDTH = 600;
-const GLint HEIGHT = 600;
+#include <glm.hpp>
+#include <gtc\matrix_transform.hpp>
+#include <gtc\type_ptr.hpp>
 
-// Vertex Shader
-const char* vertex_shader_source = R"(
-	#version 330 core
-	layout (location = 0) in vec2 aPos; // Vertex position attributes
-	void main() {
-		gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
-	}
-)";
+// Window dimensions
+const GLint WIDTH = 800, HEIGHT = 600;
+
+GLuint VBO, VAO, shader, uniformModel;
+
+bool direction = true;
+float triOffset = 0.0f;
+float triMaxOffset = 0.7f;
+float triIncrement = 0.0005f;
+
+// Vertex Shader code
+static const char* vShader = "                                                \n\
+#version 330                                                                  \n\
+                                                                              \n\
+layout (location = 0) in vec3 pos;											  \n\
+                                                                              \n\
+uniform mat4 model;                                                           \n\
+                                                                              \n\
+void main()                                                                   \n\
+{                                                                             \n\
+    gl_Position = model * vec4(0.4 * pos.x, 0.4 * pos.y, pos.z, 1.0);		  \n\
+}";
 
 // Fragment Shader
-const char* fragment_shader_source = R"(
-	#version 330 core
-	out vec4 FragColor;
-	
-	uniform vec4 rectangleColor;
-	
-	void main() {
-		FragColor = rectangleColor; // Orange color
+static const char* fShader = "                                                \n\
+#version 330                                                                  \n\
+                                                                              \n\
+out vec4 colour;                                                               \n\
+                                                                              \n\
+void main()                                                                   \n\
+{                                                                             \n\
+    colour = vec4(1.0, 0.0, 0.0, 1.0);                                         \n\
+}";
+
+void CreateTriangle()
+{
+	GLfloat vertices[] = {
+		-1.0f, -1.0f, 0.0f,
+		1.0f, -1.0f, 0.0f,
+		0.0f, 1.0f, 0.0f
+	};
+
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glBindVertexArray(0);
+}
+
+void AddShader(GLuint theProgram, const char* shaderCode, GLenum shaderType)
+{
+	GLuint theShader = glCreateShader(shaderType);
+
+	const GLchar* theCode[1];
+	theCode[0] = shaderCode;
+
+	GLint codeLength[1];
+	codeLength[0] = strlen(shaderCode);
+
+	glShaderSource(theShader, 1, theCode, codeLength);
+	glCompileShader(theShader);
+
+	GLint result = 0;
+	GLchar eLog[1024] = { 0 };
+
+	glGetShaderiv(theShader, GL_COMPILE_STATUS, &result);
+	if (!result)
+	{
+		glGetShaderInfoLog(theShader, 1024, NULL, eLog);
+		fprintf(stderr, "Error compiling the %d shader: '%s'\n", shaderType, eLog);
+		return;
 	}
-)";
 
-int main() {
+	glAttachShader(theProgram, theShader);
+}
 
-	// initialize GLFW
-	if (!glfwInit()) {
-		std::cout << "GLFW Initialization Failed!" << std::endl;
+void CompileShaders()
+{
+	shader = glCreateProgram();
+
+	if (!shader)
+	{
+		printf("Failed to create shader\n");
+		return;
+	}
+
+	AddShader(shader, vShader, GL_VERTEX_SHADER);
+	AddShader(shader, fShader, GL_FRAGMENT_SHADER);
+
+	GLint result = 0;
+	GLchar eLog[1024] = { 0 };
+
+	glLinkProgram(shader);
+	glGetProgramiv(shader, GL_LINK_STATUS, &result);
+	if (!result)
+	{
+		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
+		printf("Error linking program: '%s'\n", eLog);
+		return;
+	}
+
+	glValidateProgram(shader);
+	glGetProgramiv(shader, GL_VALIDATE_STATUS, &result);
+	if (!result)
+	{
+		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
+		printf("Error validating program: '%s'\n", eLog);
+		return;
+	}
+
+	uniformModel = glGetUniformLocation(shader, "model");
+}
+
+int main()
+{
+	// Initialise GLFW
+	if (!glfwInit())
+	{
+		printf("GLFW initialisation failed!");
 		glfwTerminate();
 		return 1;
 	}
 
-	// setup GLFW window property
-	// openGL version
+	// Setup GLFW window properties
+	// OpenGL version
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	// core profile means no backward compatibility
+	// Core Profile
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	// allow forward compatibility
+	// Allow Forward Compatbility
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-	GLFWwindow* mainWindow = glfwCreateWindow(WIDTH, HEIGHT, "Main Window", NULL, NULL);
-	if (!mainWindow) {
-		std::cerr << "Window Creation Failed!" << std::endl;
+	// Create the window
+	GLFWwindow* mainWindow = glfwCreateWindow(WIDTH, HEIGHT, "Test Window", NULL, NULL);
+	if (!mainWindow)
+	{
+		printf("GLFW window creation failed!");
 		glfwTerminate();
-		return -1; // return non-zero value to indicate an error
+		return 1;
 	}
-	// get buffer size information
-	int bufferWidth;
-	int bufferHeight;
+
+	// Get Buffer Size information
+	int bufferWidth, bufferHeight;
 	glfwGetFramebufferSize(mainWindow, &bufferWidth, &bufferHeight);
 
-	// set context for GLEW to use
+	// Set context for GLEW to use
 	glfwMakeContextCurrent(mainWindow);
 
-	// allow modern extension features
+	// Allow modern extension features
 	glewExperimental = GL_TRUE;
 
-	// initialize GLEW
-	if (glewInit() != GLEW_OK) {
-		std::cerr << "GLEW Initialization Failed!" << std::endl;
+	if (glewInit() != GLEW_OK)
+	{
+		printf("GLEW initialisation failed!");
 		glfwDestroyWindow(mainWindow);
 		glfwTerminate();
-		return -1;
+		return 1;
 	}
 
-	// setup viewport size
+	// Setup Viewport size
 	glViewport(0, 0, bufferWidth, bufferHeight);
-	
-	// Create and compile the vertex shader
-	GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
-	glCompileShader(vertex_shader);
 
-	// Check for vertex shader compilation errors / success
-	GLint success;
-	GLchar info_log[512];
-	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
-		std::cerr << "Vertex shader compilation failed : " << info_log << std::endl;
-	}
-	else {
-		glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
-		std::cout << "Vertex shader compilation succeed " << info_log << std::endl;
-	}
+	CreateTriangle();
+	CompileShaders();
 
-	// Create and compile the fragment shader
-	GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
-	glCompileShader(fragment_shader);
-
-	// Check for fragment shader compilation errors / success
-	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
-		std::cerr << "Fragment shader compilation failed : " << info_log << std::endl;
-	}
-	else {
-		glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
-		std::cout << "Fragment shader compilation succeed " << info_log << std::endl;
-	}
-
-	// Create and link the shader program
-	GLuint shader_program = glCreateProgram();
-	glAttachShader(shader_program, vertex_shader);
-	glAttachShader(shader_program, fragment_shader);
-	glLinkProgram(shader_program);
-
-	// Check for shader program linking errors / success
-	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-		std::cerr << "Shader program linking failed : " << info_log << std::endl;
-	}
-	else {
-		glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-		std::cout << "Shader program linking succeed " << info_log << std::endl;
-	}
-
-	// Delete the vertex shader and fragment shader after successfully linked into a shader program
-	glDeleteShader(vertex_shader);
-	glDeleteShader(fragment_shader);
-
-	// Get the location of the uniform variable in the shader program
-	GLint color_uniform_location = glGetUniformLocation(shader_program, "rectangleColor");
-
-	// Define the vertices
-	GLfloat vertices[] = {
-		// vertices for rectangle in x, y coordinate
-
-			// First triangle
-		-0.5f, -0.5f, // Bottom-left vertex
-		 0.5f, -0.5f, // Bottom-right vertex
-		 0.5f,  0.5f, // Top-right vertex
-
-			// Second triangle
-		-0.5f, -0.5f, // Bottom-left vertex (shared with the first triangle)
-		 0.5f,  0.5f, // Top-right vertex (shared with the first triangle)
-		-0.5f,  0.5f  // Top-left vertex (new vertex for the second triangle)
-	};
-
-	// Set up the Vertex Array Object (VAO)
-	GLuint VAO;
-	GLuint VBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-
-	// Bind the VAO and the VBO
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-	
-	//glBufferData allocates memory on the GPU and copies the vertex datato the VBO
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	// Define the layout of the vertex data
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
-
-	// main loop until window close
-	while (!glfwWindowShouldClose(mainWindow)) {
-		// Create a random number generator engine
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_real_distribution<float> dis(0.0f, 1.0f); // random float between 0.0 and 1.0
-
-		// Generate random color components
-		float red = dis(gen);
-		float green = dis(gen);
-		float blue = dis(gen);
-
-		// Set the uniform color with the random values
-		glUseProgram(shader_program);
-		glUniform4f(color_uniform_location, red, green, blue, 1.0f);
-
-		// get & handle user input events
+	// Loop until window closed
+	while (!glfwWindowShouldClose(mainWindow))
+	{
+		// Get + Handle user input events
 		glfwPollEvents();
 
-		// clear window
+		if (direction)
+		{
+			triOffset += triIncrement;
+		}
+		else {
+			triOffset -= triIncrement;
+		}
+
+		if (abs(triOffset) >= triMaxOffset)
+		{
+			direction = !direction;
+		}
+
+		// Clear window
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glUseProgram(shader_program);
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3); // Draw the first triangle
-		glDrawArrays(GL_TRIANGLES, 3, 3); // Draw the second triangle
+		glUseProgram(shader);
 
-		// swap front and back buffer
+		glm::mat4 model(1.0f);
+		model = glm::translate(model, glm::vec3(triOffset, triOffset, 0.0f));
+
+		glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glBindVertexArray(0);
+
+		glUseProgram(0);
+
 		glfwSwapBuffers(mainWindow);
 	}
-
-	// Cleanup and exit
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteProgram(shader_program);
-
-	glfwTerminate();
 
 	return 0;
 }
