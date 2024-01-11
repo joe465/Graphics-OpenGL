@@ -1,225 +1,168 @@
-#include <stdio.h>
-#include <string.h>
-#include <cmath>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include <cstdlib>
 
-#include <GL\glew.h>
-#include <GLFW\glfw3.h>
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 
-#include <glm.hpp>
-#include <gtc\matrix_transform.hpp>
-#include <gtc\type_ptr.hpp>
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void DrawCube(GLfloat centerPosX, GLfloat centerPosY, GLfloat centerPosZ, GLfloat edgeLength);
 
-// Window dimensions
-const GLint WIDTH = 800, HEIGHT = 600;
+GLfloat rotationX = 0.0f;
+GLfloat rotationY = 0.0f;
 
-GLuint VBO, VAO, shader, uniformModel;
-
-bool direction = true;
-float triOffset = 0.0f;
-float triMaxOffset = 0.7f;
-float triIncrement = 0.0005f;
-
-// Vertex Shader code
-static const char* vShader = "                                                \n\
-#version 330                                                                  \n\
-                                                                              \n\
-layout (location = 0) in vec3 pos;											  \n\
-                                                                              \n\
-uniform mat4 model;                                                           \n\
-                                                                              \n\
-void main()                                                                   \n\
-{                                                                             \n\
-    gl_Position = model * vec4(0.4 * pos.x, 0.4 * pos.y, pos.z, 1.0);		  \n\
-}";
-
-// Fragment Shader
-static const char* fShader = "                                                \n\
-#version 330                                                                  \n\
-                                                                              \n\
-out vec4 colour;                                                               \n\
-                                                                              \n\
-void main()                                                                   \n\
-{                                                                             \n\
-    colour = vec4(1.0, 0.0, 0.0, 1.0);                                         \n\
-}";
-
-void CreateTriangle()
+int main(void)
 {
-	GLfloat vertices[] = {
-		-1.0f, -1.0f, 0.0f,
-		1.0f, -1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f
-	};
+    GLFWwindow* window;
 
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
+    // Initialize the library
+    if (!glfwInit())
+    {
+        return -1;
+    }
 
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // Create a windowed mode window and its OpenGL context
+    window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Hello World", NULL, NULL);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
+    glfwSetKeyCallback(window, keyCallback);
+    glfwSetInputMode(window, GLFW_STICKY_KEYS, 1);
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	glBindVertexArray(0);
+    int screenWidth, screenHeight;
+    glfwGetFramebufferSize(window, &screenWidth, &screenHeight);
+
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
+    }
+
+    // Make the window's context current
+    glfwMakeContextCurrent(window);
+
+    glViewport(0.0f, 0.0f, screenWidth, screenHeight); // specifies the part of the window to which OpenGL will draw (in pixels), convert from normalised to pixels
+    glMatrixMode(GL_PROJECTION); // projection matrix defines the properties of the camera that views the objects in the world coordinate frame. Here you typically set the zoom factor, aspect ratio and the near and far clipping planes
+    glLoadIdentity(); // replace the current matrix with the identity matrix and starts us a fresh because matrix transforms such as glOrpho and glRotate cumulate, basically puts us at (0, 0, 0)
+    glOrtho(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0, 1000); // essentially set coordinate system
+    glMatrixMode(GL_MODELVIEW); // (default matrix mode) modelview matrix defines how your objects are transformed (meaning translation, rotation and scaling) in your world
+    glLoadIdentity(); // same as above comment
+
+    GLfloat halfScreenWidth = SCREEN_WIDTH / 2;
+    GLfloat halfScreenHeight = SCREEN_HEIGHT / 2;
+
+
+    // Loop until the user closes the window
+    while (!glfwWindowShouldClose(window))
+    {
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // Render OpenGL here
+
+        glPushMatrix();
+        glTranslatef(halfScreenWidth, halfScreenHeight, -500);
+        glRotatef(rotationX, 1, 0, 0);
+        glRotatef(rotationY, 0, 1, 0);
+        glTranslatef(-halfScreenWidth, -halfScreenHeight, 500);
+
+        DrawCube(halfScreenWidth, halfScreenHeight, -500, 200);
+
+        glPopMatrix();
+
+
+        // Swap front and back buffers
+        glfwSwapBuffers(window);
+
+        // Poll for and process events
+        glfwPollEvents();
+    }
+
+    glfwTerminate();
+
+    return 0;
 }
 
-void AddShader(GLuint theProgram, const char* shaderCode, GLenum shaderType)
+
+
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	GLuint theShader = glCreateShader(shaderType);
+    //std::cout << key << std::endl;
 
-	const GLchar* theCode[1];
-	theCode[0] = shaderCode;
+    const GLfloat rotationSpeed = 5;
 
-	GLint codeLength[1];
-	codeLength[0] = strlen(shaderCode);
+    // actions are GLFW_PRESS, GLFW_RELEASE or GLFW_REPEAT
+    if (action == GLFW_PRESS || action == GLFW_REPEAT)
+    {
+        switch (key)
+        {
+        case GLFW_KEY_UP:
+            rotationX -= rotationSpeed;
+            break;
+        case GLFW_KEY_DOWN:
+            rotationX += rotationSpeed;
+            break;
+        case GLFW_KEY_RIGHT:
+            rotationY += rotationSpeed;
+            break;
+        case GLFW_KEY_LEFT:
+            rotationY -= rotationSpeed;
+            break;
+        }
 
-	glShaderSource(theShader, 1, theCode, codeLength);
-	glCompileShader(theShader);
 
-	GLint result = 0;
-	GLchar eLog[1024] = { 0 };
-
-	glGetShaderiv(theShader, GL_COMPILE_STATUS, &result);
-	if (!result)
-	{
-		glGetShaderInfoLog(theShader, 1024, NULL, eLog);
-		fprintf(stderr, "Error compiling the %d shader: '%s'\n", shaderType, eLog);
-		return;
-	}
-
-	glAttachShader(theProgram, theShader);
+    }
 }
 
-void CompileShaders()
+
+void DrawCube(GLfloat centerPosX, GLfloat centerPosY, GLfloat centerPosZ, GLfloat edgeLength)
 {
-	shader = glCreateProgram();
+    GLfloat halfSideLength = edgeLength * 0.5f;
 
-	if (!shader)
-	{
-		printf("Failed to create shader\n");
-		return;
-	}
+    GLfloat vertices[] =
+    {
+        // front face
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // top left
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // top right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength, // bottom right
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength, // bottom left
 
-	AddShader(shader, vShader, GL_VERTEX_SHADER);
-	AddShader(shader, fShader, GL_FRAGMENT_SHADER);
+        // back face
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // top left
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // top right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // bottom right
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // bottom left
 
-	GLint result = 0;
-	GLchar eLog[1024] = { 0 };
+        // left face
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // top left
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // top right
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // bottom right
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength, // bottom left
 
-	glLinkProgram(shader);
-	glGetProgramiv(shader, GL_LINK_STATUS, &result);
-	if (!result)
-	{
-		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
-		printf("Error linking program: '%s'\n", eLog);
-		return;
-	}
+        // right face
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // top left
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // top right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // bottom right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength, // bottom left
 
-	glValidateProgram(shader);
-	glGetProgramiv(shader, GL_VALIDATE_STATUS, &result);
-	if (!result)
-	{
-		glGetProgramInfoLog(shader, sizeof(eLog), NULL, eLog);
-		printf("Error validating program: '%s'\n", eLog);
-		return;
-	}
+        // top face
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // top left
+        centerPosX - halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // top right
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ - halfSideLength, // bottom right
+        centerPosX + halfSideLength, centerPosY + halfSideLength, centerPosZ + halfSideLength, // bottom left
 
-	uniformModel = glGetUniformLocation(shader, "model");
-}
+        // top face
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength, // top left
+        centerPosX - halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // top right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ - halfSideLength, // bottom right
+        centerPosX + halfSideLength, centerPosY - halfSideLength, centerPosZ + halfSideLength  // bottom left
+    };
 
-int main()
-{
-	// Initialise GLFW
-	if (!glfwInit())
-	{
-		printf("GLFW initialisation failed!");
-		glfwTerminate();
-		return 1;
-	}
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glColor3f( colour[0], colour[1], colour[2] );
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, vertices);
 
-	// Setup GLFW window properties
-	// OpenGL version
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	// Core Profile
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	// Allow Forward Compatbility
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glDrawArrays(GL_QUADS, 0, 24);
 
-	// Create the window
-	GLFWwindow* mainWindow = glfwCreateWindow(WIDTH, HEIGHT, "Test Window", NULL, NULL);
-	if (!mainWindow)
-	{
-		printf("GLFW window creation failed!");
-		glfwTerminate();
-		return 1;
-	}
-
-	// Get Buffer Size information
-	int bufferWidth, bufferHeight;
-	glfwGetFramebufferSize(mainWindow, &bufferWidth, &bufferHeight);
-
-	// Set context for GLEW to use
-	glfwMakeContextCurrent(mainWindow);
-
-	// Allow modern extension features
-	glewExperimental = GL_TRUE;
-
-	if (glewInit() != GLEW_OK)
-	{
-		printf("GLEW initialisation failed!");
-		glfwDestroyWindow(mainWindow);
-		glfwTerminate();
-		return 1;
-	}
-
-	// Setup Viewport size
-	glViewport(0, 0, bufferWidth, bufferHeight);
-
-	CreateTriangle();
-	CompileShaders();
-
-	// Loop until window closed
-	while (!glfwWindowShouldClose(mainWindow))
-	{
-		// Get + Handle user input events
-		glfwPollEvents();
-
-		if (direction)
-		{
-			triOffset += triIncrement;
-		}
-		else {
-			triOffset -= triIncrement;
-		}
-
-		if (abs(triOffset) >= triMaxOffset)
-		{
-			direction = !direction;
-		}
-
-		// Clear window
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		glUseProgram(shader);
-
-		glm::mat4 model(1.0f);
-		model = glm::translate(model, glm::vec3(triOffset, triOffset, 0.0f));
-
-		glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
-
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		glBindVertexArray(0);
-
-		glUseProgram(0);
-
-		glfwSwapBuffers(mainWindow);
-	}
-
-	return 0;
+    glDisableClientState(GL_VERTEX_ARRAY);
 }
